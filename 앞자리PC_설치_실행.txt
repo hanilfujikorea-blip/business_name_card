@@ -75,7 +75,8 @@ cd /d "C:\WA\2026.07 명함 자동발주 시스템\4. business_card_order_mailer
 
 schtasks /Query /TN "KGroupBusinessCardPortal" /FO LIST
 
-기존 작업이 표시될 때만 아래 명령으로 기존 작업을 삭제한다.
+“지정된 파일을 찾을 수 없습니다”가 나오면 아직 등록된 작업이 없다는 정상 결과이므로 바로 등록 단계로 진행한다.
+기존 작업 정보가 표시될 때만 아래 명령으로 기존 작업을 삭제한다.
 
 schtasks /Delete /TN "KGroupBusinessCardPortal" /F
 
