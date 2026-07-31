@@ -1,4 +1,5 @@
 c54d9b9bbb8a36e6489363ddd01139707fd781d72f1f9e90c7ec65d0061368e0 *python-3.13.14-amd64.exe
+4290d838761485bb4dcccfbf1856186bc73d1f3ae35171221aee4baf0f25dd83 *requirements-offline.txt
 7a91720bc756843502c3b7504c77b8fe44217c85c537d85037f0f536151b2caa *wheels\et_xmlfile-2.0.0-py3-none-any.whl
 5282c12b107bffeef825f4617dc029afaf41d0ea60823bbb665ef3079dc79de2 *wheels\openpyxl-3.1.5-py2.py3-none-any.whl
 1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a *wheels\python_dotenv-1.2.2-py3-none-any.whl
