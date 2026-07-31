@@ -204,6 +204,35 @@ class OfflineSetupTests(unittest.TestCase):
         self.assertIn("--isolated", arguments)
         self.assertIn("--no-cache-dir", arguments)
 
+    def test_runtime_smoke_check_does_not_run_development_suite(self):
+        with self._copied_project("runtime smoke") as project_dir:
+            fake_bin = project_dir / "fake-bin"
+            fake_bin.mkdir()
+            fake_python = fake_bin / "fake-python.cmd"
+            argument_log = project_dir / "python-arguments.txt"
+            fake_python.write_text(
+                "@echo off\r\n"
+                "echo %*>>\"%FAKE_ARGUMENT_LOG%\"\r\n"
+                "echo %* | findstr /I \"unittest\" >nul\r\n"
+                "if not errorlevel 1 exit /b 53\r\n"
+                "exit /b 0\r\n",
+                encoding="ascii",
+            )
+            environment = os.environ.copy()
+            environment["FAKE_ARGUMENT_LOG"] = str(argument_log)
+            environment["OFFLINE_SETUP_PYTHON"] = str(fake_python)
+            environment["OFFLINE_SETUP_NO_PAUSE"] = "1"
+
+            result = self._run_batch(project_dir, environment=environment)
+            self.assertTrue(argument_log.exists(), result.stdout)
+            arguments = argument_log.read_text(encoding="utf-8", errors="replace")
+
+        self.assertEqual(0, result.returncode, result.stdout)
+        self.assertIn("[OK] OFFLINE_INSTALL_COMPLETE", result.stdout)
+        self.assertIn("-c", arguments)
+        self.assertIn("business_card_mailer", arguments)
+        self.assertIn("business_card_portal", arguments)
+        self.assertNotIn("unittest", arguments.lower())
     @staticmethod
     @contextmanager
     def _copied_project(label: str):
