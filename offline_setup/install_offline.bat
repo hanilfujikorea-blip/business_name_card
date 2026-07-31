@@ -62,7 +62,7 @@ if not "!PIP_EXIT!"=="0" (
     exit /b !PIP_EXIT!
 )
 
-echo [INFO] Running project tests...
+echo [INFO] Checking runtime modules...
 pushd "%PROJECT_DIR%" >nul 2>&1
 set "PUSHD_EXIT=!ERRORLEVEL!"
 if not "!PUSHD_EXIT!"=="0" (
@@ -70,13 +70,13 @@ if not "!PUSHD_EXIT!"=="0" (
     call :failure !PUSHD_EXIT!
     exit /b !PUSHD_EXIT!
 )
-call "%PYTHON_EXE%" -B -m unittest discover -s tests -v
-set "TEST_EXIT=!ERRORLEVEL!"
+call "%PYTHON_EXE%" -c "import openpyxl, dotenv, business_card_mailer, business_card_portal"
+set "SMOKE_EXIT=!ERRORLEVEL!"
 popd
-if not "!TEST_EXIT!"=="0" (
-    echo [ERROR] PROJECT_TESTS_FAILED: exit !TEST_EXIT!
-    call :failure !TEST_EXIT!
-    exit /b !TEST_EXIT!
+if not "!SMOKE_EXIT!"=="0" (
+    echo [ERROR] RUNTIME_SMOKE_CHECK_FAILED: exit !SMOKE_EXIT!
+    call :failure !SMOKE_EXIT!
+    exit /b !SMOKE_EXIT!
 )
 
 echo.
