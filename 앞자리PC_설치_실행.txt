@@ -1,4 +1,4 @@
-﻿K Group 명함 자동발주 - 앞자리 PC 오프라인 설치 및 실행
+K Group 명함 자동발주 - 앞자리 PC 오프라인 설치 및 실행
 
 [중요]
 1. 앞자리 PC에서 실행하기 전에 기존 PC의 명함 자동발주 프로그램을 먼저 종료한다.
@@ -49,7 +49,7 @@ dir "..\3. SOA_fup_sales\archive_mailer_api.py"
 [3. 최초 1회 동기화]
 운영포털이 직접 승인 상태인지 확인한 뒤 아래 명령을 입력한다.
 
-run_business_card_mailer.bat sync
+.\run_business_card_mailer.bat sync
 
 메일 확인 건수, 새 신청서 건수, 발송 가능 건수가 표시되는지 확인한다.
 
@@ -120,3 +120,269 @@ schtasks /Run /TN "KGroupBusinessCardPortal"
 또는 프로젝트 폴더에서 CMD를 열고 아래 명령을 입력한다.
 
 run_business_card_mailer.bat
+
+[8. 화면에 “메일 서버에 연결할 수 없습니다”가 표시될 때]
+이 문구는 포털 자체는 실행되었지만 회사 메일 서버에 연결하지 못했다는 뜻이다.
+Python 재설치나 작업 스케줄러 재등록을 먼저 하지 않는다.
+
+1) 앞자리 PC를 회사망에 연결하거나 회사 VPN을 먼저 켠다.
+2) 반드시 프로젝트 폴더에서 PowerShell을 연다.
+   현재 창의 경로가 `C:\Users\warehouse`처럼 보이면 잘못된 위치다.
+   파일 탐색기에서 실제 프로젝트 폴더를 연 뒤 주소창에 `powershell`을 입력하고 Enter를 누른다.
+   또는 아래처럼 실제 설치 경로로 먼저 이동한다(경로는 앞자리 PC에 맞게 수정).
+
+   cd "C:\WA\2026.07 명함 자동발주 시스템\4. business_card_order_mailer"
+
+   아래 명령으로 `.env`가 보이는지 확인한다.
+
+   Test-Path .env
+
+   결과가 `True`여야 한다. `False`이면 프로젝트 폴더가 아니므로 이 점검을 중단하고 올바른 폴더에서 다시 연다.
+
+3) 아래 명령을 한 줄씩 입력한다.
+
+$u = (Get-Content .env | Where-Object { $_ -match '^ARCHIVE_BASE_URL=' } | Select-Object -First 1) -replace '^ARCHIVE_BASE_URL=',''
+$u = $u.Trim().Trim('"').Trim("'")
+if ([string]::IsNullOrWhiteSpace($u)) { Write-Host 'ARCHIVE_BASE_URL이 .env에 없습니다. .env 파일을 확인하세요.' -ForegroundColor Red; exit }
+$uri = [Uri]$u
+$port = if ($uri.Port -gt 0) {$uri.Port} elseif ($uri.Scheme -eq "https") {443} else {80}
+$uri | Select-Object Scheme,Host,Port
+Test-NetConnection -ComputerName $uri.Host -Port $port
+
+4) 결과를 확인한다.
+   TcpTestSucceeded : False
+   회사망/VPN, 방화벽 또는 메일 서버 주소 접속 문제다. 회사망/VPN 연결 상태를 확인한 뒤 다시 실행한다.
+
+   TcpTestSucceeded : True
+   네트워크는 연결된 상태다. .env의 ARCHIVE_USERNAME, ARCHIVE_PASSWORD가 현재 계정과 맞는지 담당자에게 확인한다.
+
+5) 연결을 복구한 뒤 운영포털에서 “지금 새로고침”을 누른다.
+6) 화면에 새 오류가 없고 메일 확인 건수가 표시되면 정상이다.
+
+[오류 확인 시 주의]
+- .env 파일의 비밀번호를 다른 사람에게 보내지 않는다.
+- 위 점검 결과를 공유할 때는 Scheme, Host, Port, TcpTestSucceeded만 공유한다.
+- 메일 서버가 연결되지 않은 상태에서는 자동발송으로 전환하지 않는다.
+
+
+[9. TcpTestSucceeded가 True인데 포털에 연결 오류가 표시될 때]
+PowerShell에서는 현재 폴더의 배치파일을 실행할 때 파일명 앞에 `.\`를 붙인다. CMD 창이면 `run_business_card_mailer.bat`처럼 입력해도 된다.
+이 경우 회사망/VPN과 서버 포트 연결은 정상이다. 메일 API 로그인, 계정 권한, API 경로 또는 SSL 검증 단계에서 실패한 것이다.
+
+1) 프로젝트 폴더 PowerShell에서 아래 명령을 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+2) 화면에 표시되는 마지막 오류 문구를 확인한다.
+   - HTTP 401 또는 HTTP 403 / Login required: .env의 ARCHIVE_USERNAME, ARCHIVE_PASSWORD가 틀렸거나 계정 잠금·접근 권한 문제다. 메일 웹 로그인 자체가 되는지 확인하고 담당자에게 계정 상태를 확인한다.
+   - HTTP 404: ARCHIVE_BASE_URL 또는 메일 API 경로가 현재 서버와 맞지 않는다. URL을 임의로 바꾸지 말고 관리자에게 확인한다.
+   - HTTP 500: 메일 서버 내부 오류다. 잠시 후 재시도하고 계속되면 오류 시각과 문구를 담당자에게 전달한다.
+   - SSL / certificate 오류: 회사 보안 인증서 또는 프록시 문제다. 인증서 검증을 끄지 말고 전산 담당자에게 문의한다.
+   - timeout: 서버 응답 지연 또는 프록시·방화벽 문제다. 1~2분 후 재시도한다.
+
+3) 비밀번호가 포함된 .env 파일 전체를 공유하지 않는다. 오류 문구의 마지막 한 줄만 공유한다.
+4) sync가 정상 완료되면 운영포털에서 “지금 새로고침”을 누른다.
+
+
+
+
+[10. CERTIFICATE_VERIFY_FAILED 오류가 표시될 때]
+이 오류는 회사 메일 서버의 SSL 인증서를 Python이 신뢰하지 못한다는 뜻이다. 네트워크나 비밀번호 오류가 아니다.
+
+1) 브라우저에서 https://egw.hanil-fuji.com 을 열어 인증서 경고가 있는지 확인한다.
+2) 브라우저에도 인증서 경고가 있으면 회사 보안 인증서 또는 프록시 설정 문제이므로 전산 담당자에게 인증서 설치를 요청한다.
+3) 브라우저는 정상인데 Python만 실패하면 전산 담당자에게 다음 내용을 전달한다.
+   - Python 3.13에서 CERTIFICATE_VERIFY_FAILED 발생
+   - unable to get local issuer certificate
+   - 대상: egw.hanil-fuji.com:443
+4) 전산 담당자가 제공한 회사 루트 인증서 설치가 끝난 뒤 PC를 재시작하고 아래 명령을 다시 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+5) ARCHIVE_VERIFY_SSL=false로 바꾸거나 인증서 검증을 끄는 방법은 사용하지 않는다. 메일 계정 정보가 노출될 수 있다.
+
+[11. 브라우저는 정상인데 Python SSL 오류가 나는 경우의 적용 방법]
+이 프로젝트에는 Windows ROOT 인증서 저장소를 Python SSL 검증에 추가하는 보완이 적용되어 있다.
+앞자리 PC에 프로젝트 폴더만 덮어쓰지 말고, 프로젝트 상위 폴더의 아래 파일도 최신 파일로 교체한다.
+
+프로젝트 상위 폴더\3. SOA_fup_sales\archive_mailer_api.py
+
+교체 후 프로젝트 폴더 PowerShell에서 아래 명령을 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+`archive API session opened`가 표시되고 CERTIFICATE_VERIFY_FAILED가 사라지면 정상이다.
+이 보완도 인증서 검증을 유지하므로 ARCHIVE_VERIFY_SSL=false로 변경할 필요가 없다.
+
+[12. 앞자리 PC에서 SSL 보완 파일과 실행 위치 확인]
+4-10 오류처럼 CERTIFICATE_VERIFY_FAILED가 계속 나오면, 앞자리 PC의 `3. SOA_fup_sales\archive_mailer_api.py`가 아직 수정 전 파일인 것이다. 프로젝트 폴더만 복사하면 안 되고 이 파일도 교체해야 한다.
+
+4-11 오류처럼 배치파일을 찾을 수 없으면 현재 위치가 프로젝트 상위 폴더다. 아래 명령을 순서대로 입력한다.
+
+cd "C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer"
+Test-Path .\run_business_card_mailer.bat
+Test-Path "..\3. SOA_fup_sales\archive_mailer_api.py"
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "_windows_root_certificates_pem"
+
+결과가 `True`, `True`, 함수 코드 한 줄 표시이면 파일과 위치가 정상이다. 그 다음 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+`_windows_root_certificates_pem` 검색 결과가 없으면 수정된 `archive_mailer_api.py`를 다시 복사한다.
+
+
+[13. 함수 이름을 직접 입력하지 않기]
+`_windows_root_certificates_pem`은 PowerShell 명령이 아니다. 직접 입력하지 말고 파일 안에 존재하는지 확인만 한다.
+
+수정 파일 교체 후 아래 명령으로 확인한다.
+
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "def _windows_root_certificates_pem"
+
+`def _windows_root_certificates_pem` 한 줄이 표시되어야 한다. 아무것도 표시되지 않으면 수정 파일이 아직 교체되지 않은 것이다.
+이 상태에서 sync를 실행하면 CERTIFICATE_VERIFY_FAILED가 계속 발생한다.
+
+[14. 최신 SSL 보완본 재교체]
+ROOT와 CA 인증서 저장소를 함께 읽도록 SSL 보완본을 다시 업데이트했다. 앞자리 PC의 아래 파일을 최신 파일로 다시 교체한다.
+
+C:\AI\2026.07 명함 자동발주 시스템\3. SOA_fup_sales\archive_mailer_api.py
+
+프로젝트 폴더에서 아래 두 줄을 확인한다.
+
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "def _windows_root_certificates_pem"
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "ssl_ctx = _build_verified_ssl_context"
+
+두 명령 모두 코드 한 줄을 표시해야 한다. 이후 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+[15. 앞자리 PC에서 수정 파일 확인하는 정확한 방법]
+앞자리 PC에서 아래 순서대로 진행한다.
+
+1) 파일 탐색기에서 다음 프로젝트 폴더를 연다.
+
+C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer
+
+2) 파일 탐색기 주소창에 `powershell`을 입력하고 Enter를 누른다.
+PowerShell 입력 위치가 아래처럼 프로젝트 폴더로 끝나야 한다.
+
+PS C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer>
+
+상위 폴더에서 열었다면 아래 명령을 먼저 입력한다.
+
+cd "C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer"
+
+3) 아래 두 명령을 각각 한 줄씩 입력하고 Enter를 누른다.
+TXT의 설명 문장이나 `PS C:\...>` 표시는 입력하지 않는다.
+
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "def _windows_root_certificates_pem"
+
+Select-String -Path "..\3. SOA_fup_sales\archive_mailer_api.py" -Pattern "ssl_ctx = _build_verified_ssl_context"
+
+4) 두 명령 모두 파일 경로와 코드 줄을 표시하면 정상이다.
+5) 확인이 끝나면 아래 명령으로 동기화한다.
+
+.\run_business_card_mailer.bat sync
+
+[16. 두 확인 명령이 정상인데 SSL 오류가 계속될 때]
+이 경우 브라우저와 Python의 접속 경로가 다를 수 있다. 앞자리 PC에서 아래 두 명령을 실행한다.
+
+netsh winhttp show proxy
+
+Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name ProxyEnable,ProxyServer -ErrorAction SilentlyContinue
+
+결과 해석:
+- `Direct access` 또는 ProxyEnable이 0이면 프록시를 사용하지 않는 상태다.
+- ProxyEnable이 1이거나 ProxyServer 주소가 표시되면 브라우저가 회사 프록시를 사용하는 상태다.
+
+이 결과와 CERTIFICATE_VERIFY_FAILED 마지막 한 줄만 담당자에게 공유한다. 사용자명·비밀번호가 포함된 .env 파일은 공유하지 않는다.
+
+[17. 프록시가 없는데 SSL 오류가 계속될 때]
+4-17 결과처럼 WinHTTP 프록시가 없고 ProxyEnable이 0이면 프록시 문제는 아니다. Windows와 Python의 인증서 신뢰 상태를 비교한다.
+
+1) Windows 인증서 저장소에 회사·메일 관련 인증서가 있는지 확인한다.
+
+Get-ChildItem Cert:\CurrentUser\Root,Cert:\LocalMachine\Root,Cert:\CurrentUser\CA,Cert:\LocalMachine\CA | Where-Object { $_.Subject -match "hanil|fuji|egw|proxy|gateway" -or $_.Issuer -match "hanil|fuji|egw|proxy|gateway" } | Format-Table Subject,Issuer,Thumbprint,NotAfter -AutoSize
+
+2) Windows HTTPS 접속 자체를 확인한다.
+
+curl.exe -v --connect-timeout 10 https://egw.hanil-fuji.com/login -o NUL
+
+3) 결과 해석:
+- 인증서 발급자와 HTTP 응답이 표시되면 Windows는 인증서를 신뢰한다. 이 경우 마지막 curl 출력과 CERTIFICATE_VERIFY_FAILED 한 줄을 공유한다.
+- curl도 인증서 검증 실패면 앞자리 PC의 Windows 인증서 저장소에 발급기관 인증서가 없는 상태다. Chrome 인증서 상세 화면에서 인증서 체인을 내보내 별도 CA 파일로 등록하는 방법을 검토한다.
+
+[18. curl에서 CRYPT_E_REVOCATION_OFFLINE이 표시될 때]
+이 오류는 서버 연결 실패가 아니라 인증서 폐기 목록(CRL/OCSP)을 확인할 온라인 경로가 없다는 뜻이다.
+아래 명령은 원인 비교용으로만 실행한다.
+
+curl.exe --ssl-no-revoke -v --connect-timeout 10 https://egw.hanil-fuji.com/login -o NUL
+
+이 명령이 HTTP 응답을 받으면 인증서 자체는 맞고 폐기 확인 경로만 오프라인인 상태다.
+`--ssl-no-revoke` 옵션을 프로그램 설정이나 ARCHIVE_VERIFY_SSL에 적용하지 않는다.
+
+[19. 브라우저 인증서 체인을 CA 번들로 지정하기]
+4-20에서 `--ssl-no-revoke`로 HTTP 200이 확인되면 아래 방법으로 인증서 체인을 앱에 지정한다.
+
+1) Chrome에서 https://egw.hanil-fuji.com 을 연다.
+2) 주소창 왼쪽 자물쇠 아이콘 → 연결이 안전함 → 인증서가 유효함 → 인증서 상세 정보로 들어간다.
+3) 인증서 경로(Certification Path)에 표시된 중간 인증서와 루트 인증서를 각각 선택해 내보낸다.
+   파일 형식은 `Base-64 encoded X.509 (.CER)`를 선택한다.
+4) 내보낸 파일을 앞자리 PC의 아래 폴더에 저장한다.
+
+C:\AI\2026.07 명함 자동발주 시스템\3. SOA_fup_sales
+
+5) 인증서가 두 개라면 해당 폴더 PowerShell에서 하나의 PEM 파일로 합친다.
+
+Get-Content .\중간인증서.cer, .\루트인증서.cer | Set-Content .\egw-ca-bundle.pem
+
+인증서가 하나면 파일명을 `egw-ca-bundle.pem`으로 바꿔도 된다.
+6) 같은 폴더의 `.env` 파일에 아래 줄을 추가하거나 값을 수정한다.
+
+ARCHIVE_CA_BUNDLE=egw-ca-bundle.pem
+
+7) 프로젝트 폴더에서 동기화한다.
+
+cd "C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer"
+.\run_business_card_mailer.bat sync
+
+`ARCHIVE_VERIFY_SSL=false`로 변경하지 않는다. CA 번들은 인증서 검증을 유지한 채 신뢰할 체인만 추가한다.
+
+[20. 최종 정상 확인 및 평소 실행 방법]
+인증서 CA 번들 적용 후 아래 결과가 나오면 설치가 정상 완료된 것이다.
+
+- archive API session opened / closed 표시
+- 메일 확인 건수 표시
+- CERTIFICATE_VERIFY_FAILED 없음
+- 새 신청서와 발송 가능 건수 표시
+
+평소 실행:
+
+1) 프로젝트 폴더에서 PowerShell을 연다.
+
+cd "C:\AI\2026.07 명함 자동발주 시스템\4. business_card_order_mailer"
+
+2) 포털을 실행한다.
+
+.\run_business_card_mailer.bat
+
+3) 브라우저에서 아래 주소를 연다.
+
+http://127.0.0.1:8765/
+
+4) 메일만 새로 확인하려면 포털을 종료하지 않고 별도 PowerShell에서 아래 명령을 실행한다.
+
+.\run_business_card_mailer.bat sync
+
+직접 승인 모드에서는 자동 발송되지 않는다. 운영포털에서 신청서를 확인한 뒤 직접 승인한다.
+
+[21. 원클릭 실행 파일]
+프로젝트 폴더의 아래 파일을 앞자리 PC 바탕화면에 바로가기 또는 복사해 둔다.
+
+KGroup_명함자동발주_원클릭실행.bat
+
+이 파일을 더블클릭하면:
+1) 명함 자동발주 포털이 실행된다.
+2) 포털이 8765 포트를 열 때까지 최대 30초 기다린 뒤 브라우저가 http://127.0.0.1:8765/ 를 연다.
+3) 포털 실행 창은 최소화되어 백그라운드에서 유지된다. 오류가 나도 창이 바로 닫히지 않아 원인을 확인할 수 있다.
+
+포털을 종료하려면 최소화된 `KGroup Business Card Portal` 창을 닫는다.
