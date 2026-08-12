@@ -1,25 +1,10 @@
+node_modules/
+dist/
 .env
-.env.txt
-__pycache__/
-*.pyc
-.test-tmp/
-.codex_patches/
-.superpowers/
-.superdesign/
-docs/superpowers/
-tmp*/
-
-# Business-card request workbooks may contain personal information.
-*.xls
-*.xlsx
-*.xlsm
-
-# Runtime inbox settings and downloaded requests stay local.
-inbox/*
-!inbox/requests/
-inbox/requests/*
-!inbox/requests/.gitkeep
-
-# Generated previews, logs, state, and send history stay local.
-output/*
-!output/.gitkeep
+data/*.json
+uploads/business-card-orders/*
+!data/.gitkeep
+!uploads/business-card-orders/.gitkeep
+logs/
+_backup/
+*.log
